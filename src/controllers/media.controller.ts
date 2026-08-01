@@ -18,7 +18,7 @@ export async function analyze(req: Request, res: Response) {
 }
 
 export async function downloadStart(req: Request, res: Response) {
-  const { url, format, title } = req.body;
+  const { url, format, title, sublang } = req.body;
   if (!url) return res.status(400).json({ error: "URL manquante" });
 
   try {
@@ -26,13 +26,19 @@ export async function downloadStart(req: Request, res: Response) {
       url,
       format,
       title,
+      sublang,
     });
 
     // Log optionnel en DB, associé à l'utilisateur si connecté (optionalAuth)
     const userId = (req as any).user?.id || null;
     if (data?.jobId) {
       try {
-        await queries.logDownload(userId, url, format || "default", title || "video");
+        await queries.logDownload(
+          userId,
+          url,
+          format || "default",
+          title || "video",
+        );
       } catch (e) {
         console.error("[downloadStart] échec log DB (non bloquant)", e);
       }
@@ -84,7 +90,11 @@ export async function file(req: Request, res: Response) {
     });
 
     // On relaie les headers pertinents envoyés par le video-service
-    const passthroughHeaders = ["content-disposition", "content-type", "content-length"];
+    const passthroughHeaders = [
+      "content-disposition",
+      "content-type",
+      "content-length",
+    ];
     for (const h of passthroughHeaders) {
       const value = upstream.headers[h];
       if (value) res.setHeader(h, value);
@@ -93,7 +103,8 @@ export async function file(req: Request, res: Response) {
     upstream.data.pipe(res);
   } catch (e: any) {
     const status = e.response?.status || 502;
-    const message = e.response?.data?.error || "Fichier non disponible ou expiré.";
+    const message =
+      e.response?.data?.error || "Fichier non disponible ou expiré.";
     return res.status(status).json({ error: message });
   }
 }
