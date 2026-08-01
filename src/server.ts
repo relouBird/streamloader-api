@@ -117,7 +117,7 @@ export default class Server {
     this.server = this.app?.listen(this.port, () => {
       console.log(`
 ╔══════════════════════════════════════════════════════════════╗
-║  StreamLoader v2.1 — ${this.prod ? "PRODUCTION" : "DÉVELOPPEMENT"}                         ║
+║  StreamLoader v1.0 — ${this.prod ? "PRODUCTION" : "DÉVELOPPEMENT"}                         ║
 ║  http://localhost:${this.port}                                      ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  ✅ Rate limiting      (global + analyze + download + auth)  ║
