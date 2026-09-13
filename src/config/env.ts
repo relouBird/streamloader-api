@@ -17,7 +17,7 @@ const ENV = {
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || "",
 
   // ── Auth / JWT ───────────────────────────────────────────────
-  JWT_SECRET: process.env.API_SECRET || "",
+  JWT_SECRET: process.env.JWT_SECRET || "",
   ADMIN_TOKEN: process.env.ADMIN_TOKEN || "",
 
   // ── Base de données MySQL ───────────────────────────────────────

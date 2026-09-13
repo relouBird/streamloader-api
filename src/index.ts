@@ -15,7 +15,7 @@ async function bootstrap() {
     ENV.PORT,
     ENV.APP_URL,
     ENV.JWT_SECRET,
-    "GENIUS_P_SECRET",
+    ENV.GENIUSPAY_WEBHOOK_SECRET,
     ENV.IS_PROD,
   );
 

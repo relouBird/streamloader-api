@@ -6,8 +6,8 @@ import rateLimit from "express-rate-limit";
 import { db } from "./database/index";
 
 // Importations des constantes
-import { CONSTANTS } from "./constants";
 import { isWeakSecret } from "./utils/helper";
+import { IncomingMessage } from "http";
 
 // definition des types
 export type GetterFunction = (req: Request, res: Response) => void;
@@ -74,15 +74,19 @@ export default class Server {
       express.json({
         limit: "10kb",
         verify: (req, _res, buf) => {
-          (req as import("express").Request).rawBody = Buffer.from(buf);
+          (req as IncomingMessage & { rawBody?: Buffer }).rawBody =
+            Buffer.from(buf);
         },
       }),
     );
     this.app.use(express.urlencoded({ extended: true, limit: "10kb" }));
     this.app.use(express.static(path.join(__dirname, "public")));
 
-    // Headers de sécurité minimalistes
-    this.app.use((_req, res, next) => {
+    // Headers de securite minimalistes et Logger global
+    this.app.use((req, res, next) => {
+      const start = Date.now();
+      const { method, originalUrl, body, query, params } = req;
+
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.setHeader("X-Frame-Options", "DENY");
       res.setHeader("Referrer-Policy", "no-referrer");
@@ -99,6 +103,23 @@ export default class Server {
           "frame-ancestors 'none'",
         ].join("; "),
       );
+
+      // 3. Capturer la réponse pour le log de fin
+      const originalSend = res.send;
+      res.send = function (data) {
+        const duration = Date.now() - start;
+        console.log(
+          `[GLOBAL] ${method} ${originalUrl.toLocaleUpperCase()} - ${res.statusCode} (${duration}ms)`,
+        );
+        if (query && Object.keys(query).length) console.log(`   Query:`, query);
+        if (params && Object.keys(params).length)
+          console.log(`   Params:`, params);
+        if (body && Object.keys(body).length) console.log(`   Body:`, body);
+
+        // On appelle la fonction originale avec le bon contexte 'this'
+        return originalSend.call(this, data);
+      };
+
       next();
     });
 
@@ -161,15 +182,15 @@ export default class Server {
     this.server = this.app?.listen(this.port, () => {
       console.log(`
 ╔══════════════════════════════════════════════════════════════╗
-║  StreamLoader v1.0 — ${this.prod ? "PRODUCTION" : "DÉVELOPPEMENT"}                         ║
-║  http://localhost:${this.port}                                      ║
+║  StreamLoader v1.0 — ${this.prod ? "PRODUCTION" : "DÉVELOPPEMENT"}                           ║
+║  http://localhost:${this.port}                                       ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  ✅ Rate limiting      (global + analyze + download + auth)  ║
 ║  ✅ SSE progression    (/api/progress/:jobId)                ║
 ║  ✅ Tokens de fichier  (/api/file/:jobId — usage unique)     ║
-║  ✅ CORS               (${this.prod ? "strict : " + this.url : "dev : *"})    ║
+║  ✅ CORS               (${this.prod ? "strict : " + this.url : "dev : *"})                             ║
 ║  ✅ yt-dlp auto-update (24h)                                 ║
-║  ✅ Graceful shutdown  (SIGINT / SIGTERM)                     ║
+║  ✅ Graceful shutdown  (SIGINT / SIGTERM)                    ║
 ╚══════════════════════════════════════════════════════════════╝
   `);
     });

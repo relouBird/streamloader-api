@@ -73,6 +73,11 @@ export async function initiate(req: Request, res: Response) {
 // ─────────────────────────────────────────────────────────────────
 
 export async function geniuspayWebhook(req: Request, res: Response) {
+  // ⬇️ AJOUT : identifie la requête (timestamp + headers signature/event/env)
+  console.log(
+    `\n[Webhook] ${new Date().toISOString()} sig=${req.get("X-Webhook-Signature")?.slice(0, 12) ?? "ABSENT"}… event=${req.get("X-Webhook-Event") ?? "—"} env=${req.get("X-Webhook-Environment") ?? "—"}`,
+  );
+
   // 1. Signature HMAC-SHA256 (timestamp + "." + payload brut)
   if (!verifyGeniusPaySignature(req)) {
     return res.status(401).json({ error: "Signature webhook invalide" });
@@ -91,6 +96,7 @@ export async function geniuspayWebhook(req: Request, res: Response) {
   try {
     switch (payload.event) {
       case "payment.success": {
+        console.log("FOUUUUUUUUUUUUUUUUUUUUUUUUUUU");
         await activatePremium(payload.data.reference, payload.data.amount);
         break;
       }
