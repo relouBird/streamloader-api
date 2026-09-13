@@ -26,7 +26,7 @@ export async function register(req: Request, res: Response) {
     const id = uuid();
     await queries.createUser(id, email.toLowerCase(), hash);
 
-    const token = jwt.sign({ id }, JWT_SECRET, { expiresIn: "30d" });
+    const token = jwt.sign({ id }, JWT_SECRET, { expiresIn: '30d', algorithm: 'HS256' });
     const user = await queries.getUserById(id);
 
     res.status(201).json({ success: true, token, user });
@@ -48,11 +48,11 @@ export async function login(req: Request, res: Response) {
     if (!valid)
       return res.status(401).json({ error: "Email ou mot de passe incorrect" });
 
-    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "30d" });
+    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30d', algorithm: 'HS256' });
     res.json({
       success: true,
       token,
-      user: { id: user.id, email: user.email, plan: user.plan, created_at: user.created_at },
+      user: { id: user.id, email: user.email, plan: user.plan, trim_trials_used: user.trim_trials_used, created_at: user.created_at }
     });
   } catch (e: any) {
     console.error("[login]", e.message);

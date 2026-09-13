@@ -24,3 +24,10 @@ export const authLimiter = rateLimit({
   message: { error: "Trop de tentatives. Réessaie dans 15 minutes." },
   skipSuccessfulRequests: true,
 });
+
+export const reviewLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 5,
+  message: { error: "Trop d'avis envoyés depuis cette adresse aujourd'hui." },
+  keyGenerator: (req) => req.ip ?? "",
+});

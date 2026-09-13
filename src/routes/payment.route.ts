@@ -1,27 +1,32 @@
-// routes/payment.route.ts
+// routes/payment-test.route.ts
 import express from "express";
-import { downloadLimiter } from "../utils/limiters";
+import * as paymentTestController from "../controllers/payment.controller";
 import { authMiddleware } from "../utils/helper";
-import * as paymentController from "../controllers/payment.controller";
+import { downloadLimiter } from "../utils/limiters";
 
-const PaymentRouter = express.Router();
+const PaymentTestRouter = express.Router();
 
-PaymentRouter.post(
+PaymentTestRouter.post(
   "/initiate",
   authMiddleware,
   downloadLimiter,
-  paymentController.initiate,
+  paymentTestController.webhookCinetpayTest,
 );
 
-// Les webhooks restent en POST (appelés par les prestataires de paiement, pas par le navigateur)
-PaymentRouter.post("/webhook/cinetpay", paymentController.webhookCinetpay);
+PaymentTestRouter.post(
+  "/webhook/geniuspay",
+  paymentTestController.webhookCinetpayTest,
+);
 
-// ⚠️ manquait dans le router d'origine (présent dans server.js) — rajouté
-PaymentRouter.post("/webhook/campay", paymentController.webhookCampay);
+PaymentTestRouter.post(
+  "/statut/:txId",
+  authMiddleware,
+  paymentTestController.webhookCinetpayTest,
+);
 
-PaymentRouter.post("/webhook/wave", paymentController.webhookWave);
+// GET : ce sont des pages de retour (redirection navigateur), pas des soumissions
+PaymentTestRouter.get("/success", paymentTestController.success);
 
-// GET : simple lecture de statut
-PaymentRouter.get("/status/:txId", authMiddleware, paymentController.status);
+PaymentTestRouter.get("/cancel", paymentTestController.cancel);
 
-export default PaymentRouter;
+export default PaymentTestRouter;

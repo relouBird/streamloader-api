@@ -5,6 +5,10 @@ import path from "path";
 import rateLimit from "express-rate-limit";
 import { db } from "./database/index";
 
+// Importations des constantes
+import { CONSTANTS } from "./constants";
+import { isWeakSecret } from "./utils/helper";
+
 // definition des types
 export type GetterFunction = (req: Request, res: Response) => void;
 
@@ -15,15 +19,32 @@ export default class Server {
   readonly prod: boolean = false;
   protected app: Express | undefined;
 
+  // Nouvelles données
+  readonly GENIUSPAY_WEBHOOK_SECRET: string = "";
+  readonly AD_REDIRECT_URL: string = "";
+  readonly ADMIN_TOKEN: string = "";
+
   protected server: any;
 
-  constructor(port: number, url: string, secret: string, prod: boolean) {
+  constructor(
+    port: number,
+    url: string,
+    secret: string,
+    geniusPaySecret: string,
+    prod: boolean,
+  ) {
     this.port = Number(port);
-    if (!secret) {
+    if (!secret || isWeakSecret(secret)) {
       throw new Error("JWT_SECRET manquant dans .env");
     }
-    this.url = url;
     this.secret = secret;
+
+    if (!geniusPaySecret || isWeakSecret(geniusPaySecret)) {
+      throw new Error(
+        "GENIUSPAY_WEBHOOK_SECRET trop faible en production. Configurez un secret de webhook robuste.",
+      );
+    }
+    this.url = url;
     this.prod = prod;
   }
 
@@ -41,6 +62,7 @@ export default class Server {
     };
 
     this.app = express();
+    this.app.set("trust proxy", 1);
     this.app.use(cors(corsOptions));
     this.app.options("*", cors(corsOptions)); // Pre-flight
 
@@ -56,6 +78,20 @@ export default class Server {
     this.app.use((_req, res, next) => {
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.setHeader("X-Frame-Options", "DENY");
+      res.setHeader("Referrer-Policy", "no-referrer");
+      res.setHeader(
+        "Content-Security-Policy",
+        [
+          "default-src 'self'",
+          "script-src 'self' 'unsafe-inline'",
+          "style-src 'self' 'unsafe-inline'",
+          "img-src 'self' data: https:",
+          "connect-src 'self'",
+          "object-src 'none'",
+          "base-uri 'self'",
+          "frame-ancestors 'none'",
+        ].join("; "),
+      );
       next();
     });
 
@@ -71,6 +107,7 @@ export default class Server {
       legacyHeaders: false,
       message: { error: "Trop de requêtes. Réessaie dans 15 minutes." },
     });
+    
     this.app.use("/api/", globalLimiter);
 
     this.app.get("/", (_req: Request, res: Response) => {
@@ -139,7 +176,7 @@ export default class Server {
   // Etat de santé de la page
   getHealth() {
     this.app?.get("/api/health", (_, res) => {
-      console.log("[Health] App State...")
+      console.log("[Health] App State...");
       res.json({
         status: "ok",
         version: "2.1.0",
