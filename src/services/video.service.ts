@@ -1,10 +1,9 @@
-// utils/videoService.ts
+// services/video.service.ts
 import axios from "axios";
-import dotenv from "dotenv";
-dotenv.config(); // ⚠️ DOIT être appelé avant toute lecture de process.env plus bas
+import ENV from "../config/env";
 
-const VIDEO_SERVICE_URL = process.env.VIDEO_SERVICE_URL || "";
-const VIDEO_SERVICE_SECRET = process.env.VIDEO_SERVICE_SECRET || "";
+const VIDEO_SERVICE_URL = ENV.VIDEO_SERVICE_URL;
+const VIDEO_SERVICE_SECRET = ENV.VIDEO_SERVICE_SECRET;
 
 if (!VIDEO_SERVICE_URL) throw new Error("VIDEO_SERVICE_URL manquant dans .env");
 if (!VIDEO_SERVICE_SECRET)

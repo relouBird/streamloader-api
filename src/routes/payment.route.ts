@@ -10,18 +10,18 @@ PaymentTestRouter.post(
   "/initiate",
   authMiddleware,
   downloadLimiter,
-  paymentTestController.webhookCinetpayTest,
+  paymentTestController.initiate,
 );
 
 PaymentTestRouter.post(
   "/webhook/geniuspay",
-  paymentTestController.webhookCinetpayTest,
+  paymentTestController.geniuspayWebhook,
 );
 
 PaymentTestRouter.post(
   "/statut/:txId",
   authMiddleware,
-  paymentTestController.webhookCinetpayTest,
+  paymentTestController.getStatus,
 );
 
 // GET : ce sont des pages de retour (redirection navigateur), pas des soumissions

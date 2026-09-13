@@ -70,7 +70,14 @@ export default class Server {
     //  MIDDLEWARES GLOBAUX
     // ─────────────────────────────────────────────────────────────────
 
-    this.app.use(express.json({ limit: "10kb" }));
+    this.app.use(
+      express.json({
+        limit: "10kb",
+        verify: (req, _res, buf) => {
+          (req as import("express").Request).rawBody = Buffer.from(buf);
+        },
+      }),
+    );
     this.app.use(express.urlencoded({ extended: true, limit: "10kb" }));
     this.app.use(express.static(path.join(__dirname, "public")));
 
@@ -107,7 +114,7 @@ export default class Server {
       legacyHeaders: false,
       message: { error: "Trop de requêtes. Réessaie dans 15 minutes." },
     });
-    
+
     this.app.use("/api/", globalLimiter);
 
     this.app.get("/", (_req: Request, res: Response) => {

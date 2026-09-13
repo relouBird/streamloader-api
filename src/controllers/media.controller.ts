@@ -1,14 +1,14 @@
 // controllers/media.controller.ts
 import type { Request, Response } from "express";
 import type { Readable } from "stream";
-import { videoService } from "../utils/videoService";
+import { videoService } from "../services/video.service";
 import { queries } from "../database/queries";
 import { assertPublicHttpUrl, firstString, normalizeError, parseTimeToSeconds, sanitizeTitle } from "../utils/helper";
 import type {
   AnalyzeResponse,
   DownloadStartResponse,
   ProgressEvent,
-} from "../types/videoService";
+} from "../types/videoService.type";
 
 // ─────────────────────────────────────────────────────────────────
 //  CONFIG (à extraire dans config.ts si tu veux)

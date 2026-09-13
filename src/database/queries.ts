@@ -9,7 +9,7 @@ import type {
   PendingReview,
   ApprovedReview,
   ReviewStats,
-} from "./types";
+} from "../types/database.type";
 
 // Helper pour caster le tuple [rows, fields] renvoyé par db.execute
 function first<T>(rows: unknown): T | null {
@@ -125,6 +125,15 @@ export const queries = {
     await db.execute(
       `UPDATE transactions
        SET status='completed', updated_at=datetime('now')
+       WHERE id = ?`,
+      [id],
+    );
+  },
+
+  async failTransaction(id: string): Promise<void> {
+    await db.execute(
+      `UPDATE transactions
+       SET status='failed', updated_at=datetime('now')
        WHERE id = ?`,
       [id],
     );

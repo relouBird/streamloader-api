@@ -1,29 +1,22 @@
 // index.ts
-import dotenv from "dotenv";
-dotenv.config(); // ⚠️ DOIT être appelé avant toute lecture de process.env plus bas
-
+import ENV from "./config/env";
 import Server from "./server";
 import { initializeDatabase } from "./database/initORM";
 
 // Routeurs
 import AuthRouter from "./routes/auth.route";
 import MediaRouter from "./routes/media.route";
-import PaymentRouter from "./routes/payment-v0.route";
+import PaymentRouter from "./routes/payment.route";
 import ReviewsRouter from "./routes/reviews.route";
 import AdminReviewRouter from "./routes/admin-reviews.route";
 
-const PORT = Number(process.env.PORT) || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || "";
-const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
-const IS_PROD = process.env.NODE_ENV === "production";
-
 async function bootstrap() {
   const server = new Server(
-    PORT,
-    APP_URL,
-    JWT_SECRET,
+    ENV.PORT,
+    ENV.APP_URL,
+    ENV.JWT_SECRET,
     "GENIUS_P_SECRET",
-    IS_PROD,
+    ENV.IS_PROD,
   );
 
   await initializeDatabase();

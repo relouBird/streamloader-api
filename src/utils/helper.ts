@@ -6,15 +6,16 @@ import dotenv from "dotenv";
 import axios from "axios";
 import crypto from "crypto";
 import { promises } from "dns";
+import ENV from "../config/env";
 import { queries } from "../database/queries";
 import { CONSTANTS } from "../constants";
-import { VideoServiceErrorResponse } from "../types/videoService";
+import { VideoServiceErrorResponse } from "../types/videoService.type";
 
 dotenv.config();
 
 const JWT_VERIFY_OPTS: jwt.VerifyOptions = { algorithms: ["HS256"] };
-const JWT_SECRET = process.env.JWT_SECRET || "";
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
+const JWT_SECRET = ENV.JWT_SECRET;
+const ADMIN_TOKEN = ENV.ADMIN_TOKEN;
 
 // ─────────────────────────────────────────────────────────────────
 //  AUTH HELPERS

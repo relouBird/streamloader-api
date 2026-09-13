@@ -3,9 +3,10 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { v4 as uuid } from "uuid";
+import ENV from "../config/env";
 import { queries } from "../database/queries";
 
-const JWT_SECRET = process.env.JWT_SECRET || "";
+const JWT_SECRET = ENV.JWT_SECRET;
 
 export async function register(req: Request, res: Response) {
   const { email, password } = req.body;
