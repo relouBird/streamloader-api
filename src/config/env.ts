@@ -31,7 +31,7 @@ const ENV = {
 
   // ── Paiement GeniusPay ────────────────────────────────────────────
   GENIUSPAY_API_URL:
-    process.env.GENIUSPAY_API_URL ?? "https://api.geniuspay.com/v1/payments",
+    process.env.GENIUSPAY_API_URL ?? "https://geniuspay.ci/api/v1/merchant/payments",
   GENIUSPAY_API_KEY: process.env.GENIUSPAY_API_KEY ?? "",
   GENIUSPAY_API_SECRET: process.env.GENIUSPAY_API_SECRET ?? "",
   GENIUSPAY_WEBHOOK_SECRET: process.env.GENIUSPAY_WEBHOOK_SECRET ?? "",
