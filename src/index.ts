@@ -46,6 +46,8 @@ async function bootstrap() {
 
   // 4. Démarre réellement l'écoute HTTP
   server.listen();
+
+  server.getRedirect();
   server.getHealth();
 
   console.log("Server started");

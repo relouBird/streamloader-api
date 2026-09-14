@@ -201,6 +201,14 @@ export default class Server {
     this.app?.get(`${endpoint}`, getter);
   }
 
+  getRedirect() {
+    this.app?.get("/api/ad-click", (_, res) => {
+      if (this.AD_REDIRECT_URL && this.AD_REDIRECT_URL != "")
+        return res.redirect(302, this.AD_REDIRECT_URL);
+      res.redirect(302, "/#pricing");
+    });
+  }
+
   // Etat de santé de la page
   getHealth() {
     this.app?.get("/api/health", (_, res) => {
