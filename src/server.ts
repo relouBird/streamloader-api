@@ -54,11 +54,37 @@ export default class Server {
   //  (server.use(...)) AVANT le fallback SPA et le error handler.
   // ─────────────────────────────────────────────────────────────────
   init() {
+    const allowedOrigins = this.prod ? [this.url.replace(/\/$/, "")] : ["*"];
+
     const corsOptions = {
-      origin: this.prod ? [this.url] : "*",
-      methods: ["GET", "POST", "OPTIONS"],
+      origin: (
+        origin: string | undefined,
+        callback: (error: Error | null, allow?: boolean) => void,
+      ) => {
+        // Requêtes sans Origin :
+        // Postman, curl, appels serveur-à-serveur, etc.
+        if (!origin) {
+          return callback(null, true);
+        }
+
+        // Développement
+        if (!this.prod) {
+          return callback(null, true);
+        }
+
+        // Production
+        if (allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+
+        console.warn(`[CORS] Origin refusée: ${origin}`);
+
+        return callback(new Error("Origin not allowed by CORS"));
+      },
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
       credentials: true,
+      optionsSuccessStatus: 204,
     };
 
     this.app = express();
