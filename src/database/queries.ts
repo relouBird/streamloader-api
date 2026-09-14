@@ -136,6 +136,7 @@ export const queries = {
     userId: string,
     provider: string,
     amount: number,
+    currency: string,
     plan: string,
   ): Promise<void> {
     await db.execute(
@@ -144,10 +145,11 @@ export const queries = {
          user_id,
          provider,
          amount,
+         currency,
          plan
        )
-       VALUES (?, ?, ?, ?, ?)`,
-      [id, userId, provider, amount, plan],
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, userId, provider, amount, currency, plan],
     );
   },
 

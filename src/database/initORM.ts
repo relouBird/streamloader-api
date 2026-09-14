@@ -23,7 +23,8 @@ export async function initializeDatabase() {
       id VARCHAR(36) PRIMARY KEY,
       user_id VARCHAR(36) NOT NULL,
       provider VARCHAR(100) NOT NULL,
-      amount INT NOT NULL,
+      amount DECIMAL(12,2) NOT NULL,
+      currency VARCHAR(10) NOT NULL,
       plan VARCHAR(50) NOT NULL DEFAULT 'monthly',
       status ENUM('pending', 'completed', 'failed')
         NOT NULL DEFAULT 'pending',

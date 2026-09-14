@@ -33,24 +33,30 @@ export async function initGeniusPay(
 
   try {
     console.log({
+      apiUrl: API_URL,
       txId,
       user,
       amount,
       currency,
     });
-    
+
     const response = await axios.post(
       PAYMENT_API_URL,
       {
-        amount: Number(amount),
+        amount,
         currency: String(currency).toUpperCase(),
         description: "StreamLoader Premium — Abonnement sélectionné",
-        reference: txId,
-        customer_email: user.email,
-        customer_name: user.email.split("@")[0],
+        customer: {
+          name: user.email.split("@")[0],
+          email: user.email,
+        },
+        metadata: {
+          txId,
+          userId: user.id,
+        },
         callback_url: `${API_URL}/api/payment/webhook/geniuspay`,
-        return_url: `${API_URL}/payment/success?tx=${txId}`,
-        cancel_url: `${API_URL}/payment/cancel?tx=${txId}`,
+        return_url: `${API_URL}/api/payment/success?tx=${txId}`,
+        cancel_url: `${API_URL}/api/payment/cancel?tx=${txId}`,
       },
       {
         headers: {

@@ -14,7 +14,7 @@ const payPage = (
   .b{max-width:420px;padding:48px 32px;}.i{font-size:56px;margin-bottom:16px;}
   h1{font-size:22px;margin-bottom:8px;} p{color:#9090B8;font-size:14px;}</style>
   </head><body>
-  <div class="b"><div class="i">${icon}</div><h1>${title}</h1><p>${msg}</p></div>
+  <div class="b"><div class="i">${icon}</div><h1>FOUUUUUUU: ${title}</h1><p>${msg}</p></div>
   </body></html>`;
 
   return text;

@@ -41,7 +41,14 @@ export async function initiate(req: Request, res: Response) {
   }
 
   const txId = "SL-" + uuid().replace(/-/g, "").slice(0, 16).toUpperCase();
-  await queries.createTransaction(txId, req.user.id, provider, amount, plan);
+  await queries.createTransaction(
+    txId,
+    req.user.id,
+    provider,
+    amount,
+    currency,
+    plan,
+  );
 
   try {
     const payment_url = await initGeniusPay(
@@ -96,8 +103,10 @@ export async function geniuspayWebhook(req: Request, res: Response) {
   try {
     switch (payload.event) {
       case "payment.success": {
-        console.log("FOUUUUUUUUUUUUUUUUUUUUUUUUUUU");
-        await activatePremium(payload.data.reference, payload.data.amount);
+        await activatePremium(
+          (payload.data.metadata as any).txId,
+          payload.data.amount,
+        );
         break;
       }
       case "payment.failed":
