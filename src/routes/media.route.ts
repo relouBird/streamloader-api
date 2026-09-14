@@ -20,6 +20,13 @@ MediaRouter.post(
   mediaController.downloadStart,
 );
 
+MediaRouter.post(
+  "/music/start",
+  downloadLimiter,
+  optionalAuth,
+  mediaController.musicStart,
+);
+
 // GET : consommé côté client via EventSource (SSE), qui ne fait que du GET
 MediaRouter.get("/progress/:jobId", mediaController.progress);
 

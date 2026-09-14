@@ -3,7 +3,13 @@ import type { Request, Response } from "express";
 import type { Readable } from "stream";
 import { videoService } from "../services/video.service";
 import { queries } from "../database/queries";
-import { assertPublicHttpUrl, firstString, normalizeError, parseTimeToSeconds, sanitizeTitle } from "../utils/helper";
+import {
+  assertPublicHttpUrl,
+  firstString,
+  normalizeError,
+  parseTimeToSeconds,
+  sanitizeTitle,
+} from "../utils/helper";
 import type {
   AnalyzeResponse,
   DownloadStartResponse,
@@ -284,6 +290,49 @@ export async function downloadStart(req: Request, res: Response) {
     return res
       .status(status)
       .json(code ? { error: message, code } : { error: message });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  POST /api/media/music/start — recherche + téléchargement + métadonnées/pochette
+// ─────────────────────────────────────────────────────────────────
+
+export async function musicStart(req: Request, res: Response) {
+  const { query, title, artist, coverUrl } = req.body;
+  if (!query) return res.status(400).json({ error: "query manquant" });
+
+  // On préfère un clientKey basé sur l'IP de confiance d'Express.
+  const clientKey = req.user?.id ?? `ip:${req.ip ?? "unknown"}`;
+
+  try {
+    const { data, status } = await videoService.post("/download/music", {
+      query,
+      title,
+      artist,
+      coverUrl,
+    });
+
+    const userId = (req as any).user?.id || null;
+    if (data?.jobId) {
+      try {
+        await queries.logDownload(
+          userId,
+          clientKey,
+          `ytsearch1:${query}`,
+          "music",
+          title || "audio",
+          false,
+        );
+      } catch (e) {
+        console.error("[musicStart] échec log DB (non bloquant)", e);
+      }
+    }
+
+    return res.status(status).json(data);
+  } catch (e: any) {
+    const status = e.response?.status || 502;
+    const message = e.response?.data?.error || "Service vidéo indisponible.";
+    return res.status(status).json({ error: message });
   }
 }
 
