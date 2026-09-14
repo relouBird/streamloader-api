@@ -48,7 +48,7 @@ export async function initiate(req: Request, res: Response) {
       txId,
       req.user,
       amount,
-      normalizedCurrency,
+      normalizedCurrency === "XAF" ? "XOF" : normalizedCurrency,
     );
     return res.json({
       success: true,

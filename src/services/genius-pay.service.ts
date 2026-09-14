@@ -32,6 +32,13 @@ export async function initGeniusPay(
   }
 
   try {
+    console.log({
+      txId,
+      user,
+      amount,
+      currency,
+    });
+    
     const response = await axios.post(
       PAYMENT_API_URL,
       {
