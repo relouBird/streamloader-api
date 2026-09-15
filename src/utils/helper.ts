@@ -197,8 +197,8 @@ export function isPrivateOrReservedIP(ip: string) {
   return true; // format inconnu : on bloque par prudence
 }
 
-export async function assertPublicHttpUrl(rawUrl: string) {
-  let parsed;
+export async function assertPublicHttpUrl(rawUrl: string): Promise<URL> {
+  let parsed: URL;
   try {
     parsed = new URL(rawUrl);
   } catch {
@@ -207,16 +207,17 @@ export async function assertPublicHttpUrl(rawUrl: string) {
   if (!["http:", "https:"].includes(parsed.protocol))
     throw new Error("URL invalide");
 
-  let addresses;
+  let addresses: { address: string }[];
   try {
-    addresses = await promises.lookup(parsed.hostname, { all: true });
+    const results = await promises.lookup(parsed.hostname, { all: true });
+    addresses = Array.isArray(results) ? results : [results];
   } catch {
     throw new Error("URL invalide");
   }
 
-  if (addresses.some((a) => isPrivateOrReservedIP(a.address))) {
-    throw new Error("URL invalide");
-  }
+  const isPrivate = addresses.some((a) => isPrivateOrReservedIP(a.address));
+  if (isPrivate) throw new Error("URL invalide");
+  
   return parsed;
 }
 
@@ -255,13 +256,10 @@ export function firstString(v: unknown): string | null {
   return null;
 }
 
-/** Nettoie un titre pour en faire un nom de fichier sûr. */
-export function sanitizeTitle(raw: unknown): string {
-  const str = typeof raw === "string" ? raw : "video";
-  return (
-    str
-      .replace(/[^a-zA-Z0-9\s\-_àâäéèêëîïôöùûüç]/g, "")
-      .trim()
-      .slice(0, 80) || "video"
-  );
+const SAFE_TITLE_RE = /[^a-zA-Z0-9\s\-_àâäéèêëîïôöùûüç]/g;
+
+/** Miroir de sanitize_title() côté Python — même règles, même résultat. */
+export function sanitizeTitle(title: string | undefined | null): string {
+  const cleaned = (title || "video").replace(SAFE_TITLE_RE, "").trim();
+  return cleaned.slice(0, 80) || "video";
 }

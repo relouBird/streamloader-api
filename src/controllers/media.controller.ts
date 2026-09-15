@@ -28,12 +28,43 @@ const FREE_TRIM_TRIAL_LIMIT = 3;
 const TRIM_TIME_RE = /^\d{1,2}(:\d{2}){1,2}$/; // MM:SS ou H:MM:SS
 const SUBTITLE_LANGS = ["fr", "en", "es", "it", "de", "ar"] as const;
 
+const QUERY_MAX_LENGTH = 200;
+
 // ─────────────────────────────────────────────────────────────────
 //  STORE EN MÉMOIRE : jobId → downloadLogId
 //  Permet de mettre à jour le statut en DB quand le job Python se termine.
 //  Volontairement non persistant (perdu au redémarrage — OK).
+//
+//  ⚠️ CORRECTIF fuite mémoire : si le client n'appelle jamais
+//  GET /progress/:jobId (onglet fermé avant, erreur réseau côté front...),
+//  l'entrée n'était jamais retirée — ni le log DB mis à jour, qui restait
+//  bloqué en "pending" indéfiniment. Un TTL + purge périodique corrige ça.
 // ─────────────────────────────────────────────────────────────────
-const jobLogMap = new Map<string, number>();
+const JOB_LOG_TTL_MS = 30 * 60 * 1000; // 30 min, cohérent avec le TTL des jobs côté Python
+const jobLogMap = new Map<
+  string,
+  { downloadLogId: number; createdAt: number }
+>();
+
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [jobId, entry] of jobLogMap) {
+      if (now - entry.createdAt > JOB_LOG_TTL_MS) {
+        jobLogMap.delete(jobId);
+        // On ne sait pas si le job a réussi ou échoué (le client n'a jamais
+        // suivi la progression) — on le marque "error" plutôt que de le
+        // laisser indéfiniment en "pending" en base.
+        queries
+          .updateDownloadStatus(entry.downloadLogId, "error")
+          .catch((err) =>
+            console.error("[jobLogMap cleanup] update DB failed", err),
+          );
+      }
+    }
+  },
+  5 * 60 * 1000,
+).unref();
 
 // ─────────────────────────────────────────────────────────────────
 //  GET /api/analyze
@@ -164,6 +195,12 @@ export async function downloadStart(req: Request, res: Response) {
           code: "TRIM_LIMIT_REACHED",
         });
       }
+      // ⚠️ NOTE : l'essai est décompté ICI, avant même l'appel au
+      // microservice (étape 9). Si le job échoue ensuite (vidéo
+      // indisponible, erreur yt-dlp...), l'essai gratuit est quand même
+      // consommé. Ce n'est pas un bug bloquant, mais une iniquité mineure
+      // pour l'utilisateur — à corriger si tu veux un remboursement en cas
+      // d'échec (ex: décrémenter dans le catch de l'étape 9).
       await queries.incrementTrimTrial(req.user.id);
     }
     trimSections = `*${startTime}-${endTime}`;
@@ -274,7 +311,8 @@ export async function downloadStart(req: Request, res: Response) {
 
     // Mémorise l'association jobId → downloadLogId pour mettre à jour le
     // statut en DB quand le job se terminera (via le proxy SSE ci-dessous).
-    if (downloadLogId != null) jobLogMap.set(jobId, downloadLogId);
+    if (downloadLogId != null)
+      jobLogMap.set(jobId, { downloadLogId, createdAt: Date.now() });
 
     return res.json({ success: true, jobId });
   } catch (e) {
@@ -294,45 +332,79 @@ export async function downloadStart(req: Request, res: Response) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-//  POST /api/media/music/start — recherche + téléchargement + métadonnées/pochette
+//  POST /api/music/start — recherche musicale dédiée (Shazam côté bot)
 // ─────────────────────────────────────────────────────────────────
+// Même style de gouvernance que downloadStart : quota journalier partagé
+// (une recherche musicale compte comme un téléchargement), pas de contrôle
+// de durée/4K (toujours du MP3), pas de sous-titres.
 
 export async function musicStart(req: Request, res: Response) {
-  const { query, title, artist, coverUrl } = req.body;
-  if (!query) return res.status(400).json({ error: "query manquant" });
+  const { query, title, artist, coverUrl } = req.body ?? {};
 
-  // On préfère un clientKey basé sur l'IP de confiance d'Express.
+  const safeQuery = firstString(query)?.trim();
+  if (!safeQuery) return res.status(400).json({ error: "query manquant" });
+  if (safeQuery.length > QUERY_MAX_LENGTH) {
+    return res.status(400).json({ error: "query trop long" });
+  }
+
+  const isPremiumUser = req.user?.plan === "premium";
   const clientKey = req.user?.id ?? `ip:${req.ip ?? "unknown"}`;
 
-  try {
-    const { data, status } = await videoService.post("/download/music", {
-      query,
-      title,
-      artist,
-      coverUrl,
-    });
+  // Quota journalier partagé avec les téléchargements classiques.
+  if (!isPremiumUser) {
+    const dailyCount = await queries.countDailyDownloads(clientKey);
+    if (dailyCount >= FREE_DAILY_DOWNLOAD_LIMIT) {
+      return res.status(429).json({
+        error: `Limite gratuite atteinte : ${FREE_DAILY_DOWNLOAD_LIMIT} téléchargements par jour. Passe au plan Premium pour continuer.`,
+        code: "DAILY_LIMIT_REACHED",
+      });
+    }
+  }
 
-    const userId = (req as any).user?.id || null;
-    if (data?.jobId) {
+  const safeTitle = sanitizeTitle(title);
+  let downloadLogId: number | null = null;
+  try {
+    const result = await queries.logDownload(
+      req.user?.id ?? null,
+      clientKey,
+      `ytsearch1:${safeQuery}`,
+      "music",
+      safeTitle,
+      false,
+    );
+    downloadLogId = result.insertId ?? result.lastInsertRowid ?? null;
+  } catch (e) {
+    console.error("[musicStart] échec log DB (non bloquant)", e);
+  }
+
+  try {
+    const response = await videoService.post<DownloadStartResponse>(
+      "/download/music",
+      {
+        query: safeQuery,
+        title: safeTitle,
+        artist: typeof artist === "string" ? artist : null,
+        coverUrl: typeof coverUrl === "string" ? coverUrl : null,
+      },
+    );
+
+    const jobId = response.data.jobId;
+    if (downloadLogId != null)
+      jobLogMap.set(jobId, { downloadLogId, createdAt: Date.now() });
+
+    return res.json({ success: true, jobId });
+  } catch (e) {
+    const { status, message, code } = normalizeError(e);
+    if (downloadLogId != null) {
       try {
-        await queries.logDownload(
-          userId,
-          clientKey,
-          `ytsearch1:${query}`,
-          "music",
-          title || "audio",
-          false,
-        );
-      } catch (e) {
-        console.error("[musicStart] échec log DB (non bloquant)", e);
+        await queries.updateDownloadStatus(downloadLogId, "error");
+      } catch (dbErr) {
+        console.error("[musicStart] échec update status DB", dbErr);
       }
     }
-
-    return res.status(status).json(data);
-  } catch (e: any) {
-    const status = e.response?.status || 502;
-    const message = e.response?.data?.error || "Service vidéo indisponible.";
-    return res.status(status).json({ error: message });
+    return res
+      .status(status)
+      .json(code ? { error: message, code } : { error: message });
   }
 }
 
@@ -364,7 +436,8 @@ export async function progress(req: Request, res: Response) {
   res.setHeader("X-Accel-Buffering", "no"); // désactive le buffering Nginx
   res.flushHeaders();
 
-  const downloadLogId = jobLogMap.get(jobId);
+  const jobLogEntry = jobLogMap.get(jobId);
+  const downloadLogId = jobLogEntry?.downloadLogId;
 
   // On forward chaque chunk immédiatement (latence minimale), et en
   // parallèle on parse les événements pour détecter `done` / `error` et
