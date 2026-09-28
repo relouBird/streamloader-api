@@ -134,7 +134,7 @@ export async function optionalAuthHeaderOrQuery(
  * prochain appel — aucune tâche planifiée n'est nécessaire pour "révoquer"
  * la clé, elle cesse simplement de fonctionner.
  */
-exportasync function verifyPremiumApiKey(
+export async function verifyPremiumApiKey(
   req: Request,
   res: Response,
   next: NextFunction,
