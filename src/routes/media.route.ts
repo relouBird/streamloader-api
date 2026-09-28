@@ -1,7 +1,11 @@
 // routes/media.route.ts
 import express from "express";
-import { analyzeLimiter, downloadLimiter } from "../utils/limiters";
-import { optionalAuth } from "../utils/helper";
+import {
+  analyzeLimiter,
+  apiKeyLimiter,
+  downloadLimiter,
+} from "../utils/limiters";
+import { optionalAuth, verifyPremiumApiKey } from "../utils/helper";
 import * as mediaController from "../controllers/media.controller";
 
 const MediaRouter = express.Router();
@@ -32,5 +36,37 @@ MediaRouter.get("/progress/:jobId", mediaController.progress);
 
 // GET : sert un fichier / déclenche un download navigateur
 MediaRouter.get("/file/:jobId", mediaController.file);
+
+// ─────────────────────────────────────────────────────────────────
+//  API EXTERNE PREMIUM (/api/v1/*) — authentification par clé API
+// ─────────────────────────────────────────────────────────────────
+
+MediaRouter.get(
+  "/v1/analyze",
+  apiKeyLimiter,
+  verifyPremiumApiKey,
+  mediaController.analyze,
+);
+
+MediaRouter.get(
+  "/v1/download",
+  apiKeyLimiter,
+  verifyPremiumApiKey,
+  mediaController.downloadStart,
+);
+
+MediaRouter.get(
+  "/download/:jobId",
+  apiKeyLimiter,
+  verifyPremiumApiKey,
+  mediaController.progress,
+);
+
+MediaRouter.get(
+  "/download/:jobId/file",
+  apiKeyLimiter,
+  verifyPremiumApiKey,
+  mediaController.file,
+);
 
 export default MediaRouter;

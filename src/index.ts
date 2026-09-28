@@ -5,6 +5,7 @@ import { initializeDatabase } from "./database/initORM";
 
 // Routeurs
 import AuthRouter from "./routes/auth.route";
+import AccountRouter from "./routes/account.route";
 import MediaRouter from "./routes/media.route";
 import PaymentRouter from "./routes/payment.route";
 import ReviewsRouter from "./routes/reviews.route";
@@ -31,6 +32,9 @@ async function bootstrap() {
 
   // ─── Auth (authentification) ─────────────────────────────────────────────────────
   server.use("/api/auth", AuthRouter);
+
+  // ─── Auth (authentification) ─────────────────────────────────────────────────────
+  server.use("/api/account", AccountRouter);
 
   // ─── Media (video-service yt-dlp) ────────────────────────────────────────────────
   server.use("/api/media", MediaRouter);

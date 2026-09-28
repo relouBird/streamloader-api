@@ -31,3 +31,13 @@ export const reviewLimiter = rateLimit({
   message: { error: "Trop d'avis envoyés depuis cette adresse aujourd'hui." },
   keyGenerator: (req) => req.ip ?? "",
 });
+
+// Limiteur de l'API externe Premium (/api/v1/*) — basé sur la clé API et non
+// l'IP, pour ne pas pénaliser un intégrateur dont le trafic sort d'une IP
+// partagée (backend d'entreprise, proxy, etc.).
+export const apiKeyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: { error: "Trop de requêtes API. Réessaie dans 1 minute." },
+  keyGenerator: (req) => req.get("x-api-key") || req.ip || "",
+});

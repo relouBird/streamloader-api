@@ -13,6 +13,11 @@ const ENV = {
   VIDEO_SERVICE_URL: process.env.VIDEO_SERVICE_URL || "",
   VIDEO_SERVICE_SECRET: process.env.VIDEO_SERVICE_SECRET || "",
 
+  // ── Service BOT ──────────────────────────────────────────────────
+  X_BOT_SECRET:
+    process.env.X_BOT_SECRET ||
+    "dev_DHIODJ2HDJHf9866557djsdhsqhoKKNNdsf7Y64fdsRT54RdUJDIIUHiihdsoh68739698Y",
+
   // ── Service BOT ───────────────────────────────────────────────
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || "",
 
@@ -31,7 +36,8 @@ const ENV = {
 
   // ── Paiement GeniusPay ────────────────────────────────────────────
   GENIUSPAY_API_URL:
-    process.env.GENIUSPAY_API_URL ?? "https://geniuspay.ci/api/v1/merchant/payments",
+    process.env.GENIUSPAY_API_URL ??
+    "https://geniuspay.ci/api/v1/merchant/payments",
   GENIUSPAY_API_KEY: process.env.GENIUSPAY_API_KEY ?? "",
   GENIUSPAY_API_SECRET: process.env.GENIUSPAY_API_SECRET ?? "",
   GENIUSPAY_WEBHOOK_SECRET: process.env.GENIUSPAY_WEBHOOK_SECRET ?? "",

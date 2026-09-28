@@ -18,7 +18,7 @@ const JWT_SECRET = ENV.JWT_SECRET;
 const ADMIN_TOKEN = ENV.ADMIN_TOKEN;
 
 // ─────────────────────────────────────────────────────────────────
-//  AUTH HELPERS
+//  AUTH MIDDLEWARES / HELPERS MIDDLEWARES
 //  ⚠️ queries.getUserById est async (mysql2/promise) → il faut await
 // ─────────────────────────────────────────────────────────────────
 
@@ -99,7 +99,7 @@ export function requireAdminToken(
  */
 export async function optionalAuthHeaderOrQuery(
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction,
 ) {
   const bearer = req.headers.authorization?.startsWith("Bearer ")
@@ -120,6 +120,48 @@ export async function optionalAuthHeaderOrQuery(
   } else {
     req.user = null;
   }
+  next();
+}
+
+/**
+ * Protège les routes de l'API externe Premium (/api/v1/*). Exige le header
+ * `x-api-key`, vérifie qu'il correspond à un compte existant, ET que ce
+ * compte a un statut Premium ACTIF au moment précis de la requête.
+ *
+ * Désactivation automatique : queries.getUserByApiKeyHash recalcule le statut
+ * Premium à la volée (expiration de premium_until comprise, cf. database.js).
+ * Dès qu'un abonnement expire, cette vérification échoue naturellement au
+ * prochain appel — aucune tâche planifiée n'est nécessaire pour "révoquer"
+ * la clé, elle cesse simplement de fonctionner.
+ */
+exportasync function verifyPremiumApiKey(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  const apiKey = req.get("x-api-key");
+  if (!apiKey) {
+    return res.status(401).json({
+      error: "Clé API manquante. Ajoute le header x-api-key.",
+      code: "API_KEY_MISSING",
+    });
+  }
+  const hash = crypto.createHash("sha256").update(apiKey).digest("hex");
+  const user = await queries.getUserByApiKeyHash(hash);
+  if (!user) {
+    return res
+      .status(401)
+      .json({ error: "Clé API invalide.", code: "API_KEY_INVALID" });
+  }
+  if (user.plan !== "premium") {
+    return res.status(403).json({
+      error:
+        "Cette clé API nécessite un abonnement Premium actif. Elle a été désactivée car ton abonnement n'est plus actif.",
+      code: "PREMIUM_REQUIRED",
+    });
+  }
+  req.user = user;
+  req.apiAuth = true;
   next();
 }
 
@@ -217,7 +259,7 @@ export async function assertPublicHttpUrl(rawUrl: string): Promise<URL> {
 
   const isPrivate = addresses.some((a) => isPrivateOrReservedIP(a.address));
   if (isPrivate) throw new Error("URL invalide");
-  
+
   return parsed;
 }
 
@@ -262,4 +304,19 @@ const SAFE_TITLE_RE = /[^a-zA-Z0-9\s\-_àâäéèêëîïôöùûüç]/g;
 export function sanitizeTitle(title: string | undefined | null): string {
   const cleaned = (title || "video").replace(SAFE_TITLE_RE, "").trim();
   return cleaned.slice(0, 80) || "video";
+}
+
+/**
+ * Génère une nouvelle clé API. Le préfixe "sl_" facilite la reconnaissance
+ * de nos clés dans les logs d'un intégrateur. Seul le HASH est destiné à être
+ * stocké (voir queries.setApiKey) — la valeur en clair (`raw`) n'est montrée
+ * qu'une seule fois, au moment de la génération, comme chez tout fournisseur
+ * d'API sérieux (Stripe, GitHub…) : impossible de la retrouver ensuite, seule
+ * une régénération permet d'en obtenir une nouvelle.
+ */
+export function generateApiKey() {
+  const raw = "sl_" + crypto.randomBytes(32).toString("hex");
+  const hash = crypto.createHash("sha256").update(raw).digest("hex");
+  const prefix = raw.slice(0, 12) + "…";
+  return { raw, hash, prefix };
 }

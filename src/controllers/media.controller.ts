@@ -15,14 +15,18 @@ import type {
   DownloadStartResponse,
   ProgressEvent,
 } from "../types/videoService.type";
+import ENV from "../config/env";
+import { urlToHttpOptions } from "url";
 
 // ─────────────────────────────────────────────────────────────────
 //  CONFIG (à extraire dans config.ts si tu veux)
 // ─────────────────────────────────────────────────────────────────
 
-const FREE_DAILY_DOWNLOAD_LIMIT = 30;
+const BOT_TOKEN = ENV.X_BOT_SECRET;
+
+const FREE_DAILY_DOWNLOAD_LIMIT = 20;
 const FREE_SUBTITLE_DAILY_LIMIT = 5;
-const FREE_MAX_DURATION_SEC = 3 * 60 * 60; // 3h
+const FREE_MAX_DURATION_SEC = 2 * 60 * 60; // 3h
 const FREE_TRIM_TRIAL_LIMIT = 3;
 
 const TRIM_TIME_RE = /^\d{1,2}(:\d{2}){1,2}$/; // MM:SS ou H:MM:SS
@@ -46,6 +50,8 @@ const jobLogMap = new Map<
   { downloadLogId: number; createdAt: number }
 >();
 
+const urlMap = new Map<string, { duration: number; createdAt: number }>();
+
 setInterval(
   () => {
     const now = Date.now();
@@ -60,6 +66,11 @@ setInterval(
           .catch((err) =>
             console.error("[jobLogMap cleanup] update DB failed", err),
           );
+      }
+    }
+    for (const [url, entry] of urlMap) {
+      if (now - entry.createdAt > JOB_LOG_TTL_MS) {
+        jobLogMap.delete(url);
       }
     }
   },
@@ -88,10 +99,16 @@ export async function analyze(req: Request, res: Response) {
     // directement ce body au frontend (il n'y a plus rien à normaliser ici,
     // c'est le Python qui s'en charge : formats filtrés/triés, sous-titres
     // dédupliqués, storyboards exclus, etc.).
-    const response = await videoService.post<AnalyzeResponse>("/analyze", {
+    const brutRaw = await videoService.post<AnalyzeResponse>("/analyze", {
       url,
     });
-    return res.json(response.data);
+    const response = brutRaw.data;
+
+    urlMap.set(url, {
+      duration: response.data.duration ?? 0,
+      createdAt: Date.now(),
+    });
+    return res.json(response);
   } catch (e) {
     const { status, message } = normalizeError(e);
     return res.status(status).json({ error: message });
@@ -114,6 +131,8 @@ export async function downloadStart(req: Request, res: Response) {
     endTime,
   } = req.body ?? {};
 
+  const isBot = req.header("x-bot-token") === BOT_TOKEN; // secret, pas query
+
   // 1. Validation URL
   const url = firstString(rawUrl);
   if (!url) return res.status(400).json({ error: "URL manquante" });
@@ -125,12 +144,6 @@ export async function downloadStart(req: Request, res: Response) {
   }
 
   const isPremiumUser = req.user?.plan === "premium";
-  const isAudio =
-    quality === "mp3" ||
-    quality === "audio" ||
-    (typeof format === "string" &&
-      format.includes("bestaudio") &&
-      !format.includes("bestvideo"));
 
   // ⚠️ `req.user` (optionalAuth) est typé `UserPublic | null | undefined`.
   // On préfère un clientKey basé sur l'IP de confiance d'Express.
@@ -140,7 +153,7 @@ export async function downloadStart(req: Request, res: Response) {
   //    On doit redemander l'analyse au microservice : le frontend nous
   //    envoie la qualité, pas la durée. Coût : 1 appel /analyze en plus
   //    pour les non-premium uniquement.
-  if (!isPremiumUser) {
+  if (!isPremiumUser && isBot) {
     try {
       const analysisRes = await videoService.post<AnalyzeResponse>("/analyze", {
         url,
@@ -156,6 +169,22 @@ export async function downloadStart(req: Request, res: Response) {
     } catch (e) {
       const { status, message } = normalizeError(e);
       return res.status(status).json({ error: message });
+    }
+  } else if (!isPremiumUser && !isBot) {
+    const urlMapping = urlMap.get(url);
+
+    if (urlMapping && urlMapping.duration > FREE_MAX_DURATION_SEC) {
+      const hours = (FREE_MAX_DURATION_SEC / 3600).toFixed(0);
+      return res.status(403).json({
+        error: `Vidéo trop longue pour un compte gratuit (max ${hours}h). Passe au plan Premium pour les vidéos illimitées.`,
+        code: "DURATION_LIMIT_REACHED",
+      });
+    }
+    if (!urlMapping) {
+      return res.status(403).json({
+        error: "Vous avez surement trop tardé avant de nous répondre veuillez analyser à nouveau votre url...",
+        code: "UNHANDLED_ERROR",
+      });
     }
   }
 

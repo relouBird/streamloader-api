@@ -1,4 +1,4 @@
-// routes/payment-test.route.ts
+// routes/payment.route.ts
 import express from "express";
 import * as paymentTestController from "../controllers/payment.controller";
 import { authMiddleware } from "../utils/helper";
