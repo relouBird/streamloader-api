@@ -1,160 +1,340 @@
 // database/initORM.ts
 import { db } from "./index";
 
-export async function initializeDatabase() {
-  /** ---------------------- Migration pour les utilisateurs ---------------- */
+type SqlRow = Record<string, unknown>;
+
+function rowsOf<T extends SqlRow>(rows: unknown): T[] {
+  return Array.isArray(rows) ? (rows as T[]) : [];
+}
+
+async function columnExists(
+  tableName: string,
+  columnName: string,
+): Promise<boolean> {
+  const [rows] = await db.execute(
+    `
+      SELECT 1
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?
+        AND COLUMN_NAME = ?
+      LIMIT 1
+    `,
+    [tableName, columnName],
+  );
+
+  return rowsOf(rows).length > 0;
+}
+
+async function indexExists(
+  tableName: string,
+  indexName: string,
+): Promise<boolean> {
+  const [rows] = await db.execute(
+    `
+      SELECT 1
+      FROM INFORMATION_SCHEMA.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?
+        AND INDEX_NAME = ?
+      LIMIT 1
+    `,
+    [tableName, indexName],
+  );
+
+  return rowsOf(rows).length > 0;
+}
+
+async function addColumnIfMissing(
+  tableName: string,
+  columnName: string,
+  definition: string,
+): Promise<void> {
+  const exists = await columnExists(tableName, columnName);
+
+  if (exists) {
+    return;
+  }
+
+  await db.execute(`
+    ALTER TABLE \`${tableName}\`
+    ADD COLUMN \`${columnName}\` ${definition}
+  `);
+}
+
+async function addIndexIfMissing(
+  tableName: string,
+  indexName: string,
+  definition: string,
+): Promise<void> {
+  const exists = await indexExists(tableName, indexName);
+
+  if (exists) {
+    return;
+  }
+
+  await db.execute(`
+    CREATE INDEX \`${indexName}\`
+    ON \`${tableName}\` ${definition}
+  `);
+}
+
+export async function initializeDatabase(): Promise<void> {
+  // =========================================================
+  // USERS
+  // =========================================================
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS users (
       id VARCHAR(36) PRIMARY KEY,
-      email VARCHAR(255) UNIQUE NOT NULL,
+
+      email VARCHAR(255) NOT NULL UNIQUE,
+
       password VARCHAR(255) NOT NULL,
-      plan ENUM('free', 'premium') NOT NULL DEFAULT 'free',
-      premium_until TEXT,
-      trim_trials_used INT NOT NULL DEFAULT 0,
-      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+
+      plan ENUM('free', 'premium')
+        NOT NULL DEFAULT 'free',
+
+      premium_until DATETIME NULL,
+
+      trim_trials_used INT UNSIGNED
+        NOT NULL DEFAULT 0,
+
+      api_key_hash CHAR(64) NULL,
+
+      api_key_prefix VARCHAR(32) NULL,
+
+      api_key_created_at DATETIME NULL,
+
+      created_at TIMESTAMP
+        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+      updated_at TIMESTAMP
+        NOT NULL DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP
-    )
+    ) ENGINE=InnoDB
+      DEFAULT CHARACTER SET utf8mb4
+      COLLATE utf8mb4_unicode_ci
   `);
 
-  /** ---------------------- Migration pour les transactions ---------------- */
+  // =========================================================
+  // TRANSACTIONS
+  // =========================================================
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS transactions (
       id VARCHAR(36) PRIMARY KEY,
+
       user_id VARCHAR(36) NOT NULL,
+
       provider VARCHAR(100) NOT NULL,
-      amount DECIMAL(12,2) NOT NULL,
+
+      amount DECIMAL(12, 2) NOT NULL,
+
       currency VARCHAR(10) NOT NULL,
-      plan VARCHAR(50) NOT NULL DEFAULT 'monthly',
+
+      plan VARCHAR(50)
+        NOT NULL DEFAULT 'monthly',
+
       status ENUM('pending', 'completed', 'failed')
         NOT NULL DEFAULT 'pending',
-      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+
+      created_at TIMESTAMP
+        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+      updated_at TIMESTAMP
+        NOT NULL DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
 
       CONSTRAINT fk_transactions_user
-        FOREIGN KEY (user_id) REFERENCES users(id)
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
         ON DELETE CASCADE
         ON UPDATE CASCADE
-    )
+    ) ENGINE=InnoDB
+      DEFAULT CHARACTER SET utf8mb4
+      COLLATE utf8mb4_unicode_ci
   `);
 
-  /** ---------------------- Migration pour les logs de téléchargements ---------------- */
+  // =========================================================
+  // DOWNLOADS
+  // =========================================================
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS downloads_log (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      user_id VARCHAR(36),
-      client_key TEXT,
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+
+      user_id VARCHAR(36) NULL,
+
+      client_key VARCHAR(255) NULL,
+
       url TEXT NOT NULL,
-      format VARCHAR(50),
-      title VARCHAR(255),
-      status VARCHAR(50) NOT NULL DEFAULT 'pending',
-      subtitled TINYINT(1) NOT NULL DEFAULT 0,
-      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+      format VARCHAR(50) NULL,
+
+      title VARCHAR(255) NULL,
+
+      status VARCHAR(50)
+        NOT NULL DEFAULT 'pending',
+
+      subtitled TINYINT(1)
+        NOT NULL DEFAULT 0,
+
+      created_at TIMESTAMP
+        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
       CONSTRAINT fk_downloads_user
-        FOREIGN KEY (user_id) REFERENCES users(id)
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
         ON DELETE SET NULL
         ON UPDATE CASCADE
-    )
+    ) ENGINE=InnoDB
+      DEFAULT CHARACTER SET utf8mb4
+      COLLATE utf8mb4_unicode_ci
   `);
 
-  /** ---------------------- Migration pour les avis clients ---------------- */
+  // =========================================================
+  // REVIEWS
+  // =========================================================
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS reviews (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      client_key TEXT,
-      rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
-      comment TEXT,
-      status VARCHAR(50) NOT NULL DEFAULT 'pending',
-      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+
+      client_key VARCHAR(255) NULL,
+
+      rating TINYINT UNSIGNED NOT NULL,
+
+      comment TEXT NULL,
+
+      status ENUM('pending', 'approved', 'rejected')
+        NOT NULL DEFAULT 'pending',
+
+      created_at TIMESTAMP
+        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+      CONSTRAINT chk_reviews_rating
+        CHECK (rating BETWEEN 1 AND 5)
+    ) ENGINE=InnoDB
+      DEFAULT CHARACTER SET utf8mb4
+      COLLATE utf8mb4_unicode_ci
   `);
 
-  /**
-   * Migrations de compatibilité pour les bases déjà existantes.
-   *
-   * MySQL ne permet pas toujours d'utiliser directement
-   * "ADD COLUMN IF NOT EXISTS" selon la version utilisée.
-   * On conserve donc les try/catch comme dans ton ancienne version.
-   */
+  // =========================================================
+  // MIGRATIONS DES ANCIENNES BASES
+  // =========================================================
 
-  try {
-    await db.execute(`
-      ALTER TABLE downloads_log
-      ADD COLUMN client_key TEXT
-    `);
-  } catch {}
+  await addColumnIfMissing(
+    "users",
+    "premium_until",
+    "DATETIME NULL",
+  );
 
-  try {
-    await db.execute(`
-      ALTER TABLE transactions
-      ADD COLUMN plan VARCHAR(50) NOT NULL DEFAULT 'monthly'
-    `);
-  } catch {}
+  await addColumnIfMissing(
+    "users",
+    "trim_trials_used",
+    "INT UNSIGNED NOT NULL DEFAULT 0",
+  );
 
-  try {
-    await db.execute(`
-      ALTER TABLE users
-      ADD COLUMN premium_until TEXT
-    `);
-  } catch {}
+  await addColumnIfMissing(
+    "users",
+    "api_key_hash",
+    "CHAR(64) NULL",
+  );
 
-  try {
-    await db.execute(`
-      ALTER TABLE downloads_log
-      ADD COLUMN subtitled TINYINT(1) NOT NULL DEFAULT 0
-    `);
-  } catch {}
+  await addColumnIfMissing(
+    "users",
+    "api_key_prefix",
+    "VARCHAR(32) NULL",
+  );
 
-  try {
-    await db.execute(`
-      ALTER TABLE users
-      ADD COLUMN trim_trials_used INT NOT NULL DEFAULT 0
-    `);
-  } catch {}
+  await addColumnIfMissing(
+    "users",
+    "api_key_created_at",
+    "DATETIME NULL",
+  );
 
-  /**
-   * Index.
-   *
-   * Les erreurs sont ignorées afin que l'initialisation ne plante pas
-   * si l'index existe déjà.
-   */
+  await addColumnIfMissing(
+    "transactions",
+    "currency",
+    "VARCHAR(10) NOT NULL DEFAULT 'XAF'",
+  );
 
-  try {
-    await db.execute(`
-      CREATE INDEX idx_users_email
-      ON users(email)
-    `);
-  } catch {}
+  await addColumnIfMissing(
+    "transactions",
+    "plan",
+    "VARCHAR(50) NOT NULL DEFAULT 'monthly'",
+  );
 
-  try {
-    await db.execute(`
-      CREATE INDEX idx_tx_user
-      ON transactions(user_id)
-    `);
-  } catch {}
+  await addColumnIfMissing(
+    "transactions",
+    "status",
+    "ENUM('pending', 'completed', 'failed') NOT NULL DEFAULT 'pending'",
+  );
 
-  try {
-    await db.execute(`
-      CREATE INDEX idx_dl_user
-      ON downloads_log(user_id)
-    `);
-  } catch {}
+  await addColumnIfMissing(
+    "downloads_log",
+    "client_key",
+    "VARCHAR(255) NULL",
+  );
 
-  try {
-    await db.execute(`
-      CREATE INDEX idx_reviews_status
-      ON reviews(status, created_at)
-    `);
-  } catch {}
+  await addColumnIfMissing(
+    "downloads_log",
+    "subtitled",
+    "TINYINT(1) NOT NULL DEFAULT 0",
+  );
 
-  try {
-    await db.execute(`
-      CREATE INDEX idx_dl_client
-      ON downloads_log(client_key(191), created_at)
-    `);
-  } catch {}
+  await addColumnIfMissing(
+    "reviews",
+    "status",
+    "ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending'",
+  );
+
+  // =========================================================
+  // INDEX
+  // =========================================================
+
+  await addIndexIfMissing(
+    "users",
+    "idx_users_email",
+    "(email)",
+  );
+
+  await addIndexIfMissing(
+    "users",
+    "idx_users_api_key_hash",
+    "(api_key_hash)",
+  );
+
+  await addIndexIfMissing(
+    "transactions",
+    "idx_tx_user",
+    "(user_id)",
+  );
+
+  await addIndexIfMissing(
+    "downloads_log",
+    "idx_dl_user",
+    "(user_id)",
+  );
+
+  await addIndexIfMissing(
+    "downloads_log",
+    "idx_dl_client",
+    "(client_key, created_at)",
+  );
+
+  await addIndexIfMissing(
+    "reviews",
+    "idx_reviews_status",
+    "(status, created_at)",
+  );
+
+  await addIndexIfMissing(
+    "reviews",
+    "idx_reviews_client_created",
+    "(client_key, created_at)",
+  );
 
   console.log("✅ Database initialized");
 }
