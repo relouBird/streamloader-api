@@ -1,4 +1,4 @@
-# StreamLoader v2.1 — Guide de déploiement complet
+# StreamLoaders v2.1 — Guide de déploiement complet
 
 ## Structure du projet
 

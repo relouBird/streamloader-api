@@ -1,7 +1,7 @@
 {
-  "name": "streamloader-web",
+  "name": "streamloader-back",
   "version": "2.1.0",
-  "description": "Téléchargeur vidéo universel — StreamLoader",
+  "description": "Téléchargeur vidéo universel - StreamLoaders",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

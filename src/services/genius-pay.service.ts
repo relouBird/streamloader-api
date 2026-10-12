@@ -45,7 +45,7 @@ export async function initGeniusPay(
       {
         amount,
         currency: String(currency).toUpperCase(),
-        description: "StreamLoader Premium — Abonnement sélectionné",
+        description: "StreamLoaders Premium — Abonnement sélectionné",
         customer: {
           name: user.email.split("@")[0],
           email: user.email,

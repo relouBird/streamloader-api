@@ -31,7 +31,7 @@ const ENV = {
     PORT: Number(process.env.DB_PORT) || 3306,
     USER: process.env.DB_USER || "root",
     PASSWORD: process.env.DB_PASSWORD || "",
-    NAME: process.env.DB_NAME || "streamloader",
+    NAME: process.env.DB_NAME || "streamloaders",
   },
 
   // ── Paiement GeniusPay ────────────────────────────────────────────

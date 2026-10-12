@@ -6,7 +6,7 @@ export const payPage = (
   redirect: string,
 ) =>
   `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
-  <title>${title} — StreamLoader</title>
+  <title>${title} — StreamLoaders</title>
   <meta http-equiv="refresh" content="3;url=${redirect}">
   <style>body{font-family:Inter,sans-serif;background:#13132A;color:#EEEEF8;
   display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;text-align:center;}

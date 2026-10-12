@@ -1,4 +1,4 @@
-# StreamLoader API — Documentation
+# StreamLoaders API — Documentation
 
 Backend Node/Express qui sert de point d'entrée unique pour le frontend. Il gère l'authentification, les paiements et la base de données, et délègue toute la logique de téléchargement vidéo au microservice Python (`video-service`) via un appel serveur-à-serveur transparent pour le client.
 
