@@ -204,17 +204,22 @@ export default class Server {
   //  LISTEN — démarre réellement le serveur HTTP
   // ─────────────────────────────────────────────────────────────────
   listen() {
+    // Gérons qui peut accéder à l'API en prod
+    if (this.prod) {
+      console.log("[CORS] Configuration stricte pour la production.");
+    }else{
+      console.log("[CORS] Mode développement : toutes les origines autorisées.");
+    }
     // Ecoutons...
     this.server = this.app?.listen(this.port, () => {
       console.log(`
 ╔══════════════════════════════════════════════════════════════╗
-║  StreamLoaders v1.0 — ${this.prod ? "PRODUCTION" : "DÉVELOPPEMENT"}                          ║
+║  StreamLoaders v1.0 — ${this.prod ? "PRODUCTION   " : "DÉVELOPPEMENT"}                          ║
 ║  http://localhost:${this.port}                                       ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  ✅ Rate limiting      (global + analyze + download + auth)  ║
 ║  ✅ SSE progression    (/api/progress/:jobId)                ║
 ║  ✅ Tokens de fichier  (/api/file/:jobId — usage unique)     ║
-║  ✅ CORS               (${this.prod ? "strict : " + this.url : "dev : *"})                             ║
 ║  ✅ yt-dlp auto-update (24h)                                 ║
 ║  ✅ Graceful shutdown  (SIGINT / SIGTERM)                    ║
 ╚══════════════════════════════════════════════════════════════╝
