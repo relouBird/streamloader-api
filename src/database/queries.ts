@@ -11,6 +11,7 @@ import type {
   PendingReview,
   ApprovedReview,
   ReviewStats,
+  DailyDownloadLimit,
 } from "../types/database.type";
 
 type SqlRows<T> = T[];
@@ -57,6 +58,7 @@ export const queries = {
         SELECT
           id,
           email,
+          telegram_id,
           password,
 
           CASE
@@ -88,6 +90,7 @@ export const queries = {
         SELECT
           id,
           email,
+          telegram_id,
 
           CASE
             WHEN plan = 'premium'
@@ -219,6 +222,7 @@ export const queries = {
         SELECT
           id,
           email,
+          telegram_id,
 
           CASE
             WHEN plan = 'premium'
@@ -241,6 +245,40 @@ export const queries = {
     );
 
     return first<UserPublic>(rows);
+  },
+
+  async getUserByTelegramId(telegramId: number): Promise<UserPublic | null> {
+    const [rows] = await db.execute(
+      `SELECT id, email, telegram_id,
+              CASE
+                WHEN plan = 'premium' AND premium_until IS NOT NULL
+                     AND premium_until <= NOW()
+                THEN 'free'
+                ELSE plan
+              END AS plan,
+              premium_until, trim_trials_used, created_at, updated_at
+         FROM users
+        WHERE telegram_id = ?
+        LIMIT 1`,
+      [telegramId],
+    );
+    return first<UserPublic>(rows);
+  },
+
+  async linkTelegramAccount(
+    apiKeyHash: string,
+    telegramId: number,
+  ): Promise<UserPublic | null> {
+    const [result] = await db.execute(
+      `UPDATE users
+          SET telegram_id = ?, updated_at = NOW()
+        WHERE api_key_hash = ?
+          AND (telegram_id IS NULL OR telegram_id = ?)`,
+      [telegramId, apiKeyHash, telegramId],
+    );
+    const update = result as SqlResult;
+    if (!update.affectedRows) return null;
+    return this.getUserByTelegramId(telegramId);
   },
 
   // =========================================================
@@ -383,6 +421,40 @@ export const queries = {
     const result = first<{ count: number | string }>(rows);
 
     return result ? toNumber(result.count) : 0;
+  },
+
+  async consumeDailyDownload(
+    telegramId: number,
+    userId: string | null,
+    dailyLimit: number,
+  ): Promise<{ allowed: boolean; usedCount: number }> {
+    if (!Number.isInteger(dailyLimit) || dailyLimit <= 0) {
+      throw new Error("Daily download limit must be a positive integer");
+    }
+
+    await db.execute(
+      `INSERT INTO daily_download_limits
+        (user_id, telegram_id, quota_date, used_count)
+       VALUES (?, ?, CURRENT_DATE(), 1)
+       ON DUPLICATE KEY UPDATE
+         user_id = COALESCE(VALUES(user_id), user_id),
+         used_count = IF(used_count < ?, used_count + 1, ? + 1)`,
+      [userId, telegramId, dailyLimit, dailyLimit],
+    );
+
+    const [rows] = await db.execute(
+      `SELECT id, user_id, telegram_id, quota_date, used_count
+         FROM daily_download_limits
+        WHERE telegram_id = ? AND quota_date = CURRENT_DATE()
+        LIMIT 1`,
+      [telegramId],
+    );
+    const limit = first<DailyDownloadLimit>(rows);
+    if (!limit) throw new Error("Daily download quota could not be loaded");
+    return {
+      allowed: limit.used_count <= dailyLimit,
+      usedCount: limit.used_count,
+    };
   },
 
   // =========================================================

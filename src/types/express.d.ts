@@ -1,11 +1,11 @@
 // src/express.d.ts
-import type { UserPublic } from "./database/types";
-
 declare global {
   namespace Express {
     interface Request {
       user?: any;
       apiAuth?: boolean;
+      botAuth?: boolean;
+      botTelegramId?: number;
       rawBody?: Buffer;
     }
   }

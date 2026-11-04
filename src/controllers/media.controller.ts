@@ -131,7 +131,8 @@ export async function downloadStart(req: Request, res: Response) {
     endTime,
   } = req.body ?? {};
 
-  const isBot = req.header("x-bot-token") === BOT_TOKEN; // secret, pas query
+  const isBot = Boolean(req.botAuth) ||
+    req.header("x-bot-token") === BOT_TOKEN;
 
   // 1. Validation URL
   const url = firstString(rawUrl);
@@ -147,7 +148,9 @@ export async function downloadStart(req: Request, res: Response) {
 
   // ⚠️ `req.user` (optionalAuth) est typé `UserPublic | null | undefined`.
   // On préfère un clientKey basé sur l'IP de confiance d'Express.
-  const clientKey = req.user?.id ?? `ip:${req.ip ?? "unknown"}`;
+  const clientKey = req.botTelegramId
+    ? `telegram:${req.botTelegramId}`
+    : req.user?.id ?? `ip:${req.ip ?? "unknown"}`;
 
   // 2. Contrôle de durée pour les comptes gratuits.
   //    On doit redemander l'analyse au microservice : le frontend nous
@@ -217,7 +220,27 @@ export async function downloadStart(req: Request, res: Response) {
         code: "LOGIN_REQUIRED",
       });
     }
-    if (!isPremiumUser) {
+    if (!isPremiumUser && req.botTelegramId) {
+      try {
+        const quota = await queries.consumeDailyDownload(
+          req.botTelegramId,
+          req.user?.id ?? null,
+          FREE_DAILY_DOWNLOAD_LIMIT,
+        );
+        if (!quota.allowed) {
+          return res.status(429).json({
+            error: `Limite gratuite atteinte : ${FREE_DAILY_DOWNLOAD_LIMIT} téléchargements par jour. Passe au plan Premium pour continuer.`,
+            code: "DAILY_LIMIT_REACHED",
+          });
+        }
+      } catch (error) {
+        console.error("[downloadStart] échec quota bot", error);
+        return res.status(503).json({
+          error: "Quota temporairement indisponible.",
+          code: "QUOTA_UNAVAILABLE",
+        });
+      }
+    } else if (!isPremiumUser) {
       if ((req.user.trim_trials_used ?? 0) >= FREE_TRIM_TRIAL_LIMIT) {
         return res.status(403).json({
           error: `Tu as utilisé tes ${FREE_TRIM_TRIAL_LIMIT} essais gratuits de découpage vidéo. Passe au plan Premium pour un découpage illimité.`,
@@ -377,10 +400,32 @@ export async function musicStart(req: Request, res: Response) {
   }
 
   const isPremiumUser = req.user?.plan === "premium";
-  const clientKey = req.user?.id ?? `ip:${req.ip ?? "unknown"}`;
+  const clientKey = req.botTelegramId
+    ? `telegram:${req.botTelegramId}`
+    : req.user?.id ?? `ip:${req.ip ?? "unknown"}`;
 
   // Quota journalier partagé avec les téléchargements classiques.
-  if (!isPremiumUser) {
+  if (!isPremiumUser && req.botTelegramId) {
+    try {
+      const quota = await queries.consumeDailyDownload(
+        req.botTelegramId,
+        req.user?.id ?? null,
+        FREE_DAILY_DOWNLOAD_LIMIT,
+      );
+      if (!quota.allowed) {
+        return res.status(429).json({
+          error: `Limite gratuite atteinte : ${FREE_DAILY_DOWNLOAD_LIMIT} téléchargements par jour. Passe au plan Premium pour continuer.`,
+          code: "DAILY_LIMIT_REACHED",
+        });
+      }
+    } catch (error) {
+      console.error("[musicStart] échec quota bot", error);
+      return res.status(503).json({
+        error: "Quota temporairement indisponible.",
+        code: "QUOTA_UNAVAILABLE",
+      });
+    }
+  } else if (!isPremiumUser) {
     const dailyCount = await queries.countDailyDownloads(clientKey);
     if (dailyCount >= FREE_DAILY_DOWNLOAD_LIMIT) {
       return res.status(429).json({

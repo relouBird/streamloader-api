@@ -22,6 +22,7 @@ export type ReviewStatus = "pending" | "approved" | "rejected";
 export interface UserWithPassword {
   id: string;
   email: string;
+  telegram_id: number | null;
   password: string;
   plan: UserPlan; // calculé via CASE (peut renvoyer 'free' si expiré)
   premium_until: string | null; // ISO string (TEXT en DB)
@@ -34,10 +35,19 @@ export interface UserWithPassword {
 export interface UserPublic {
   id: string;
   email: string;
+  telegram_id: number | null;
   plan: UserPlan;
   premium_until: string | null;
   trim_trials_used: number;
   created_at: string | Date;
+}
+
+export interface DailyDownloadLimit {
+  id: number;
+  user_id: string | null;
+  telegram_id: number;
+  quota_date: string | Date;
+  used_count: number;
 }
 
 // ==========================

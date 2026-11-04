@@ -109,7 +109,7 @@ export async function createApiKey(req: Request, res: Response) {
       });
     }
     const { raw, hash, prefix } = generateApiKey();
-    await queries.setApiKey(hash, prefix, req.user.id);
+    await queries.setApiKey(req.user.id, hash, prefix);
 
     // La clé en clair n'est renvoyée qu'ICI, une seule fois.
     res.json({ success: true, apiKey: raw, prefix });

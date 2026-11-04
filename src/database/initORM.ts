@@ -53,6 +53,17 @@ async function addIndexIfMissing(
   await db.execute(`CREATE INDEX \`${index}\` ON \`${table}\` ${definition}`);
 }
 
+async function addUniqueIndexIfMissing(
+  table: string,
+  index: string,
+  definition: string,
+): Promise<void> {
+  if (await indexExists(table, index)) return;
+  await db.execute(
+    `CREATE UNIQUE INDEX \`${index}\` ON \`${table}\` ${definition}`,
+  );
+}
+
 export async function initializeDatabase(): Promise<void> {
   // ─────────────────────────────────────────────
   // USERS
@@ -62,6 +73,7 @@ export async function initializeDatabase(): Promise<void> {
       id                 VARCHAR(36) PRIMARY KEY,
       email              VARCHAR(255) NOT NULL UNIQUE,
       password           VARCHAR(255) NOT NULL,
+      telegram_id        BIGINT NULL UNIQUE,
       plan               ENUM('free','premium') NOT NULL DEFAULT 'free',
       premium_until      DATETIME NULL,
       trim_trials_used   INT UNSIGNED NOT NULL DEFAULT 0,
@@ -154,6 +166,7 @@ export async function initializeDatabase(): Promise<void> {
   await addColumnIfMissing("users", "api_key_hash", "CHAR(64) NULL");
   await addColumnIfMissing("users", "api_key_prefix", "VARCHAR(32) NULL");
   await addColumnIfMissing("users", "api_key_created_at", "DATETIME NULL");
+  await addColumnIfMissing("users", "telegram_id", "BIGINT NULL");
 
   await addColumnIfMissing(
     "transactions",
@@ -192,6 +205,12 @@ export async function initializeDatabase(): Promise<void> {
   // ─────────────────────────────────────────────
   await addIndexIfMissing("users", "idx_users_email", "(email)");
   await addIndexIfMissing("users", "idx_users_api_key_hash", "(api_key_hash)");
+  await addIndexIfMissing("users", "idx_users_telegram_id", "(telegram_id)");
+  await addUniqueIndexIfMissing(
+    "users",
+    "uq_users_telegram_id",
+    "(telegram_id)",
+  );
 
   await addIndexIfMissing("transactions", "idx_tx_user", "(user_id)");
 
@@ -207,6 +226,25 @@ export async function initializeDatabase(): Promise<void> {
     "idx_reviews_status",
     "(status, created_at)",
   );
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS daily_download_limits (
+      id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      user_id     VARCHAR(36) NULL,
+      telegram_id BIGINT NOT NULL,
+      quota_date  DATE NOT NULL,
+      used_count  INT UNSIGNED NOT NULL DEFAULT 0,
+      created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                             ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_daily_download_limit (telegram_id, quota_date),
+      CONSTRAINT fk_daily_limit_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE SET NULL ON UPDATE CASCADE
+    ) ENGINE=InnoDB
+      DEFAULT CHARACTER SET utf8mb4
+      COLLATE utf8mb4_unicode_ci
+  `);
   await addIndexIfMissing(
     "reviews",
     "idx_reviews_client_created",

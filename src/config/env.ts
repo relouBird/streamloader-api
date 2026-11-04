@@ -15,8 +15,7 @@ const ENV = {
 
   // ── Service BOT ──────────────────────────────────────────────────
   X_BOT_SECRET:
-    process.env.X_BOT_SECRET ||
-    "dev_DHIODJ2HDJHf9866557djsdhsqhoKKNNdsf7Y64fdsRT54RdUJDIIUHiihdsoh68739698Y",
+    process.env.X_BOT_SECRET || "",
 
   // ── Service BOT ───────────────────────────────────────────────
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || "",

@@ -41,3 +41,10 @@ export const apiKeyLimiter = rateLimit({
   message: { error: "Trop de requêtes API. Réessaie dans 1 minute." },
   keyGenerator: (req) => req.get("x-api-key") || req.ip || "",
 });
+
+export const botSessionLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: "Trop de sessions bot. Réessaie dans 1 minute." },
+  keyGenerator: (req) => req.get("x-bot-token") || req.ip || "",
+});

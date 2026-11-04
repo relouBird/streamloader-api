@@ -10,6 +10,7 @@ import MediaRouter from "./routes/media.route";
 import PaymentRouter from "./routes/payment.route";
 import ReviewsRouter from "./routes/reviews.route";
 import AdminReviewRouter from "./routes/admin-reviews.route";
+import BotRouter from "./routes/bot.route";
 
 async function bootstrap() {
   const server = new Server(
@@ -47,6 +48,7 @@ async function bootstrap() {
 
   // ─── Modération des avis (admin) ─────────────────────────────────────────────────
   server.use("/api/admin/reviews", AdminReviewRouter);
+  server.use("/api/bot", BotRouter);
 
   // 4. Démarre réellement l'écoute HTTP
   server.listen();

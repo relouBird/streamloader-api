@@ -19,6 +19,8 @@ npm start
 
 Le serveur écoute sur `PORT` (3000 par défaut). Le détail des routes est
 disponible dans [read-api.md](./read-api.md).
+Les appels du bot Telegram sont décrits dans
+[read-bot-api.md](./read-bot-api.md).
 
 ## Build des assets
 

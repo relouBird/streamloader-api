@@ -62,8 +62,61 @@ export async function optionalAuth(
     } catch {
       req.user = null;
     }
+
   } else {
     req.user = null;
+  }
+  next();
+}
+
+export async function botAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Session bot manquante" });
+  }
+
+  try {
+    const payload = jwt.verify(
+      header.slice("Bearer ".length),
+      JWT_SECRET,
+      JWT_VERIFY_OPTS,
+    ) as jwt.JwtPayload & { typ?: string; telegramId?: unknown };
+
+    if (
+      payload.typ !== "bot" ||
+      !Number.isSafeInteger(payload.telegramId) ||
+      Number(payload.telegramId) <= 0
+    ) {
+      return res.status(401).json({ error: "Session bot invalide" });
+    }
+
+    req.botAuth = true;
+    req.botTelegramId = Number(payload.telegramId);
+    req.user = await queries.getUserByTelegramId(req.botTelegramId);
+    next();
+  } catch {
+    return res.status(401).json({ error: "Session bot invalide ou expirée" });
+  }
+}
+
+export function requireBotServiceToken(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  const provided = req.get("x-bot-token") || "";
+  if (!ENV.X_BOT_SECRET || !provided) {
+    return res.status(401).json({ error: "Service bot non authentifié" });
+  }
+
+  const a = Buffer.from(provided);
+  const b = Buffer.from(ENV.X_BOT_SECRET);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(401).json({ error: "Service bot non authentifié" });
   }
   next();
 }
