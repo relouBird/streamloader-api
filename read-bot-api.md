@@ -34,7 +34,7 @@ Réponse :
 {
   "success": true,
   "token": "<JWT valable 15 minutes>",
-  "expiresIn": "15m",
+  "expiresIn": "1d",
   "user": null
 }
 ```
