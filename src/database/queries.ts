@@ -6,7 +6,6 @@ import type {
   UserWithPassword,
   UserPublic,
   Transaction,
-  DownloadLog,
   InsertResult,
   PendingReview,
   ApprovedReview,
