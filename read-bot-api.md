@@ -42,6 +42,10 @@ Réponse :
 `user` contient le compte lié, ou `null` si le chat Telegram n'est pas encore
 lié.
 
+Chaque appel à `/session` crée l'utilisateur Telegram dans l'API s'il
+n'existe pas encore et actualise `last_seen_at`. Cela fonctionne aussi pour
+les utilisateurs qui n'ont pas lié de compte StreamLoaders.
+
 ## 2. Lier un compte
 
 Le bot envoie la clé API saisie en message privé uniquement à l'API :
@@ -105,6 +109,47 @@ GET /api/bot/media/file/<jobId>
 
 Le endpoint de progression est un flux SSE et doit conserver
 `Accept: text/event-stream`.
+
+## 4. Demander une offre de visite
+
+Après l'envoi réussi du fichier, le bot peut demander une offre avec sa
+session JWT :
+
+```http
+POST /api/bot/site-offer
+Authorization: Bearer <JWT de session bot>
+Content-Type: application/json
+```
+
+Le body est vide. L'API récupère `telegramId` depuis le JWT.
+
+Utilisateur éligible :
+
+```json
+{
+  "showSupportButton": true,
+  "redirectToken": "<JWT opaque pour le site>",
+  "expiresAt": "2026-11-06T16:59:00.000Z",
+  "nextEligibleAt": "2026-11-06T22:29:00.000Z"
+}
+```
+
+Si l'offre est encore bloquée par le délai de six heures :
+
+```json
+{
+  "showSupportButton": false,
+  "nextEligibleAt": "2026-11-06T22:29:00.000Z"
+}
+```
+
+Un utilisateur Premium reçoit également `showSupportButton: false` avec
+`reason: "premium"`. Le bot ne doit afficher le bouton que lorsque cette
+valeur est `true`. Une erreur sur cette route ne doit pas empêcher l'envoi du
+fichier déjà téléchargé.
+
+Le token est court (30 minutes), signé uniquement par l'API et ne contient
+pas de `telegramId`. Le bot ne doit ni le décoder ni le modifier.
 
 ## Règles à retirer du bot
 

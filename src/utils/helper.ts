@@ -121,6 +121,23 @@ export function requireBotServiceToken(
   next();
 }
 
+export function requireSiteOfferSecret(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  const provided = req.get("x-site-offer-secret") || "";
+  if (!ENV.SITE_OFFER_SECRET || !provided) {
+    return res.status(401).json({ error: "Site non authentifié" });
+  }
+  const a = Buffer.from(provided);
+  const b = Buffer.from(ENV.SITE_OFFER_SECRET);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(401).json({ error: "Site non authentifié" });
+  }
+  next();
+}
+
 /**
  * Protège les routes de modération des avis. Comparaison en temps constant
  * (comme pour la signature webhook) pour éviter une fuite d'information par

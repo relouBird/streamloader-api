@@ -245,6 +245,36 @@ export async function initializeDatabase(): Promise<void> {
       DEFAULT CHARACTER SET utf8mb4
       COLLATE utf8mb4_unicode_ci
   `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS telegram_users (
+      telegram_id     BIGINT PRIMARY KEY,
+      first_seen_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_seen_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_offer_at   DATETIME NULL
+    ) ENGINE=InnoDB
+      DEFAULT CHARACTER SET utf8mb4
+      COLLATE utf8mb4_unicode_ci
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS telegram_site_offer_events (
+      id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      telegram_id   BIGINT NOT NULL,
+      campaign      VARCHAR(64) NOT NULL,
+      jti           CHAR(36) NOT NULL UNIQUE,
+      token_hash    CHAR(64) NOT NULL UNIQUE,
+      offered_at    DATETIME NOT NULL,
+      expires_at    DATETIME NOT NULL,
+      verified_at   DATETIME NULL,
+      created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT fk_site_offer_telegram_user
+        FOREIGN KEY (telegram_id) REFERENCES telegram_users(telegram_id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+      INDEX idx_site_offer_telegram_campaign (telegram_id, campaign),
+      INDEX idx_site_offer_verified (verified_at)
+    ) ENGINE=InnoDB
+      DEFAULT CHARACTER SET utf8mb4
+      COLLATE utf8mb4_unicode_ci
+  `);
   await addIndexIfMissing(
     "reviews",
     "idx_reviews_client_created",

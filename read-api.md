@@ -292,6 +292,51 @@ Content-Length: 15728640
 
 ---
 
+## 🌐 Offre de visite Telegram
+
+Le site reçoit le paramètre `t` sur sa page `/from-telegram`, puis vérifie
+le token côté serveur. Le navigateur ne contacte pas directement l'API avec
+un secret.
+
+### `POST /api/bot/verify-offer`
+
+**Auth** : secret serveur-à-serveur `x-site-offer-secret`
+
+```http
+POST /api/bot/verify-offer
+x-site-offer-secret: <SITE_OFFER_SECRET>
+Content-Type: application/json
+```
+
+```json
+{
+  "token": "<redirectToken reçu dans l'URL>"
+}
+```
+
+Réponse valide :
+
+```json
+{
+  "valid": true,
+  "campaign": "site_visit",
+  "source": "telegram_bot",
+  "expiresAt": "2026-11-06T16:59:00.000Z",
+  "verifiedAt": "2026-11-06T16:30:00.000Z"
+}
+```
+
+Réponse invalide : HTTP `401`
+
+```json
+{ "valid": false, "reason": "expired" }
+```
+
+Raisons possibles : `expired`, `invalid_token`, `invalid_claims` ou
+`unknown_token`. Le serveur du site ne doit jamais accepter `telegramId`,
+`campaign` ou `valid` depuis le navigateur. Après validation, il peut rendre
+la page et ses publicités selon sa propre politique.
+
 ## 💳 Payment
 
 ### `POST /api/payment/initiate`

@@ -33,6 +33,91 @@ function toNumber(value: unknown): number {
 }
 
 export const queries = {
+  async ensureTelegramUser(telegramId: number): Promise<void> {
+    await db.execute(
+      `INSERT INTO telegram_users (telegram_id, first_seen_at, last_seen_at)
+       VALUES (?, NOW(), NOW())
+       ON DUPLICATE KEY UPDATE last_seen_at = NOW()`,
+      [telegramId],
+    );
+  },
+
+  async claimSiteOffer(
+    telegramId: number,
+    intervalHours: number,
+  ): Promise<{ offered: boolean; lastOfferAt: Date | null }> {
+    await this.ensureTelegramUser(telegramId);
+    const [result] = await db.execute(
+      `UPDATE telegram_users
+          SET last_offer_at = NOW()
+        WHERE telegram_id = ?
+          AND (last_offer_at IS NULL
+               OR last_offer_at <= DATE_SUB(NOW(), INTERVAL ? HOUR))`,
+      [telegramId, intervalHours],
+    );
+    const update = result as SqlResult;
+    const [rows] = await db.execute(
+      `SELECT last_offer_at FROM telegram_users WHERE telegram_id = ? LIMIT 1`,
+      [telegramId],
+    );
+    const row = first<{ last_offer_at: Date | null }>(rows);
+    return {
+      offered: update.affectedRows === 1,
+      lastOfferAt: row?.last_offer_at ?? null,
+    };
+  },
+
+  async createSiteOfferEvent(event: {
+    telegramId: number;
+    jti: string;
+    tokenHash: string;
+    offeredAt: Date;
+    expiresAt: Date;
+  }): Promise<void> {
+    await db.execute(
+      `INSERT INTO telegram_site_offer_events
+        (telegram_id, campaign, jti, token_hash, offered_at, expires_at)
+       VALUES (?, 'site_visit', ?, ?, ?, ?)`,
+      [
+        event.telegramId,
+        event.jti,
+        event.tokenHash,
+        event.offeredAt,
+        event.expiresAt,
+      ],
+    );
+  },
+
+  async verifySiteOffer(jti: string): Promise<{
+    telegram_id: number;
+    campaign: string;
+    expires_at: Date;
+    verified_at: Date | null;
+  } | null> {
+    const [rows] = await db.execute(
+      `SELECT telegram_id, campaign, expires_at, verified_at
+         FROM telegram_site_offer_events
+        WHERE jti = ?
+        LIMIT 1`,
+      [jti],
+    );
+    const event = first<{
+      telegram_id: number;
+      campaign: string;
+      expires_at: Date;
+      verified_at: Date | null;
+    }>(rows);
+    if (!event) return null;
+    if (!event.verified_at) {
+      await db.execute(
+        `UPDATE telegram_site_offer_events
+            SET verified_at = NOW()
+          WHERE jti = ? AND verified_at IS NULL`,
+        [jti],
+      );
+    }
+    return event;
+  },
   // =========================================================
   // USERS
   // =========================================================

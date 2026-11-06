@@ -1,13 +1,11 @@
 import express from "express";
-import {
-  botAuth,
-  requireBotServiceToken,
-} from "../utils/helper";
+import { botAuth, requireBotServiceToken } from "../utils/helper";
 import {
   analyzeLimiter,
   botSessionLimiter,
   downloadLimiter,
 } from "../utils/limiters";
+import { requireSiteOfferSecret } from "../utils/helper";
 import * as botController from "../controllers/bot.controller";
 import * as mediaController from "../controllers/media.controller";
 
@@ -24,6 +22,13 @@ BotRouter.post(
   botSessionLimiter,
   requireBotServiceToken,
   botController.linkAccount,
+);
+BotRouter.post("/site-offer", botAuth, botController.siteOffer);
+
+BotRouter.post(
+  "/verify-offer",
+  requireSiteOfferSecret,
+  botController.verifyOffer,
 );
 BotRouter.get("/me", botAuth, botController.me);
 

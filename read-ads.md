@@ -119,14 +119,11 @@ Recommandations :
 Contrat proposé :
 
 ```http
-POST /api/public/telegram-visit/verify
-Authorization: Bearer <secret serveur-site>
+POST /api/bot/verify-offer
 Content-Type: application/json
+x-site-offer-secret: <SITE_OFFER_SECRET>
 
-{
-  "token": "<jeton reçu par le site>",
-  "source": "telegram_bot"
-}
+{ "token": "<jeton reçu par le site>" }
 ```
 
 Réponse valide :
@@ -169,22 +166,34 @@ mais il n'est pas fiable comme règle métier :
 
 Il ne faut donc pas utiliser ce cache pour une restriction commerciale stricte.
 
-### Solution minimale recommandée
+### Tables API retenues
 
-Ajouter dans l'API une table ou un stockage clé-valeur minimal :
+L'API crée et met à jour un utilisateur Telegram lors de
+`POST /api/bot/session` :
 
 ```text
-telegram_ad_touch
-- telegram_user_key
-- campaign_key
-- last_offered_at
-- created_at
-- updated_at
+telegram_users
+- telegram_id       PRIMARY KEY
+- first_seen_at
+- last_seen_at
+- last_offer_at
 ```
 
-`telegram_user_key` doit être un HMAC serveur de l'identifiant Telegram, par
-exemple `HMAC-SHA256(TELEGRAM_USER_HASH_SECRET, telegramId)`. Un hash simple
-ou un identifiant Telegram en clair n'est pas nécessaire.
+Les offres sont conservées séparément :
+
+```text
+telegram_site_offer_events
+- telegram_id
+- campaign
+- jti
+- token_hash
+- offered_at
+- expires_at
+- verified_at
+```
+
+Le token n'est jamais stocké en clair. Son `jti` associe l'offre à
+l'utilisateur côté API.
 
 L'API répond au bot via `POST /api/bot/site-offer` :
 
@@ -212,14 +221,6 @@ utilisateur. L'API peut distinguer :
 
 Le bot ne doit pas prétendre que l'utilisateur a vu le site simplement parce
 que le bouton a été envoyé. La mesure fiable commence côté serveur du site.
-
-### Variante sans nouvelle table
-
-Un champ `lastTelegramSiteOfferAt` dans la table utilisateur existante peut
-suffire si l'offre est globale et unique. Cette solution est préférable à une
-nouvelle table si l'API possède déjà la relation `telegramId -> user`.
-Cependant, elle ne couvre pas proprement plusieurs campagnes ou utilisateurs
-Telegram non liés à un compte du site.
 
 ## Bouton Telegram
 

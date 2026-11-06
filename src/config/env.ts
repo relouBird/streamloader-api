@@ -16,6 +16,8 @@ const ENV = {
   // ── Service BOT ──────────────────────────────────────────────────
   X_BOT_SECRET:
     process.env.X_BOT_SECRET || "",
+  SITE_OFFER_SECRET:
+    process.env.SITE_OFFER_SECRET || "",
 
   // ── Service BOT ───────────────────────────────────────────────
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || "",
