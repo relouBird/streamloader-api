@@ -5,7 +5,7 @@ import {
   botSessionLimiter,
   downloadLimiter,
 } from "../utils/limiters";
-import { requireSiteOfferSecret } from "../utils/helper";
+// import { requireSiteOfferSecret } from "../utils/helper";
 import * as botController from "../controllers/bot.controller";
 import * as mediaController from "../controllers/media.controller";
 
@@ -27,7 +27,7 @@ BotRouter.post("/site-offer", botAuth, botController.siteOffer);
 
 BotRouter.post(
   "/verify-offer",
-  requireSiteOfferSecret,
+  // requireSiteOfferSecret,
   botController.verifyOffer,
 );
 BotRouter.get("/me", botAuth, botController.me);
